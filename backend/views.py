@@ -9,27 +9,19 @@ import math
 import time
 import numpy as np
 import cv2 
+import json
 from pathlib import Path
 
 W = 1000
 H = 500
 BASE_DIR = Path(__file__).resolve().parent.parent
 PATH = str(BASE_DIR)
-
-RADIO_VISION = 100
+RADIO_VISION = 105
 
 COLORES_LABERINTO = [
     (100, 220, 100), (240, 150, 60), (80, 100, 240),
     (200, 90, 180), (40, 200, 250), (200, 200, 50)
 ]
-
-PRECIOS_TIENDA = {
-    "triple": 100,
-    "rafaga": 120,
-    "perforante": 150,
-    "vida": 60,
-    "escudo": 90
-}
 
 ESTADO_JUEGO = {
     "nivel": 1,
@@ -37,16 +29,18 @@ ESTADO_JUEGO = {
     "enemigos_derrotados_nivel": 0,
     "ultimo_premio_nivel": 0,
     "ultimo_premio_enemigos": 0,
-    "en_tienda": False,       # Pausa el juego entre niveles y abre las tarjetas
+    "en_tienda": False,
     "vidas": 3,
     "max_vidas": 3,
     "escudo": 0,
     "max_escudo": 0,
     "ultimo_dano": 0.0,
     "mejoras": {
-        "triple": False,
-        "rafaga": False,
-        "perforante": False,
+        "multidisparo": 0,   # Dispara 1 + 2*lv proyectiles en abanico
+        "rafaga": 0,         # Ráfagas rápidas de disparos
+        "perforante": 0,     # Atraviesa paredes y enemigos
+        "velocidad": 0,      # Aumenta velocidad de movimiento
+        "vision": 0,         # Aumenta el campo de visión / linterna
     },
     "balas": [],
     "balas_enemigas": [],
@@ -69,9 +63,50 @@ def resetear_progreso_total():
     ESTADO_JUEGO["max_vidas"] = 3
     ESTADO_JUEGO["escudo"] = 0
     ESTADO_JUEGO["max_escudo"] = 0
-    ESTADO_JUEGO["mejoras"] = {"triple": False, "rafaga": False, "perforante": False}
+    ESTADO_JUEGO["mejoras"] = {
+        "multidisparo": 0,
+        "rafaga": 0,
+        "perforante": 0,
+        "velocidad": 0,
+        "vision": 0,
+    }
     ESTADO_JUEGO["balas"].clear()
     ESTADO_JUEGO["balas_enemigas"].clear()
+
+def obtener_costo_mejora(item):
+    if item == "triple":
+        item = "multidisparo"
+    m = ESTADO_JUEGO["mejoras"]
+    if item == "multidisparo":
+        return 80 + m.get("multidisparo", 0) * 40
+    elif item == "rafaga":
+        return 90 + m.get("rafaga", 0) * 45
+    elif item == "perforante":
+        return 100 + m.get("perforante", 0) * 50
+    elif item == "velocidad":
+        return 60 + m.get("velocidad", 0) * 30
+    elif item == "vision":
+        return 50 + m.get("vision", 0) * 25
+    elif item == "vida":
+        return 60 + max(0, ESTADO_JUEGO["max_vidas"] - 3) * 30
+    elif item == "escudo":
+        return 75 + ESTADO_JUEGO["max_escudo"] * 35
+    return 100
+
+def obtener_resumen_tienda():
+    return {
+        "multidisparo": {"nivel": ESTADO_JUEGO["mejoras"].get("multidisparo", 0), "costo": obtener_costo_mejora("multidisparo")},
+        "rafaga": {"nivel": ESTADO_JUEGO["mejoras"].get("rafaga", 0), "costo": obtener_costo_mejora("rafaga")},
+        "perforante": {"nivel": ESTADO_JUEGO["mejoras"].get("perforante", 0), "costo": obtener_costo_mejora("perforante")},
+        "velocidad": {"nivel": ESTADO_JUEGO["mejoras"].get("velocidad", 0), "costo": obtener_costo_mejora("velocidad")},
+        "vision": {"nivel": ESTADO_JUEGO["mejoras"].get("vision", 0), "costo": obtener_costo_mejora("vision")},
+        "vida": {"nivel": ESTADO_JUEGO["max_vidas"], "costo": obtener_costo_mejora("vida")},
+        "escudo": {"nivel": ESTADO_JUEGO["max_escudo"], "costo": obtener_costo_mejora("escudo")},
+    }
+
+def obtener_radio_vision():
+    lv_vis = ESTADO_JUEGO["mejoras"].get("vision", 0)
+    return 105 + lv_vis * 25
 
 def mostrar_aviso(texto):
     ESTADO_JUEGO["mensaje_hud"] = texto
@@ -221,39 +256,62 @@ def toca_pared(px, py, ancho, alto, paredes_candidatas):
     return False
 
 def procesar_compra(item):
-    if item not in PRECIOS_TIENDA:
-        return
-    costo = PRECIOS_TIENDA[item]
+    if item == "triple":
+        item = "multidisparo"
+    costo = obtener_costo_mejora(item)
     if ESTADO_JUEGO["monedas"] < costo:
-        mostrar_aviso(f"No tienes suficiente oro ({costo}G)")
+        mostrar_aviso(f"Necesitas {costo}G de oro")
         return
 
-    if item in ["triple", "rafaga", "perforante"]:
-        if ESTADO_JUEGO["mejoras"][item]:
-            mostrar_aviso("Ya compraste esta mejora")
-            return
+    if item in ["multidisparo", "rafaga", "perforante", "velocidad", "vision"]:
         ESTADO_JUEGO["monedas"] -= costo
-        ESTADO_JUEGO["mejoras"][item] = True
-        mostrar_aviso(f"¡{item.upper()} desbloqueado!")
+        ESTADO_JUEGO["mejoras"][item] += 1
+        nuevo_lv = ESTADO_JUEGO["mejoras"][item]
+        nombres = {
+            "multidisparo": f"¡Multidisparo Nivel {nuevo_lv}!",
+            "rafaga": f"¡Ráfaga Nivel {nuevo_lv}!",
+            "perforante": f"¡Bala Perforante Nivel {nuevo_lv}!",
+            "velocidad": f"¡Botas Nivel {nuevo_lv} (+20% Vel)!",
+            "vision": f"¡Linterna Nivel {nuevo_lv} (+25px)!",
+        }
+        mostrar_aviso(nombres.get(item, f"¡{item.upper()} Nivel {nuevo_lv}!"))
     elif item == "vida":
         ESTADO_JUEGO["monedas"] -= costo
         ESTADO_JUEGO["max_vidas"] += 1
-        ESTADO_JUEGO["vidas"] += 1
-        mostrar_aviso("¡+1 Vida Maxima!")
+        ESTADO_JUEGO["vidas"] = min(ESTADO_JUEGO["max_vidas"], ESTADO_JUEGO["vidas"] + 1)
+        mostrar_aviso(f"¡+1 Vida Máxima! ({ESTADO_JUEGO['vidas']}/{ESTADO_JUEGO['max_vidas']})")
     elif item == "escudo":
         ESTADO_JUEGO["monedas"] -= costo
         ESTADO_JUEGO["max_escudo"] += 1
         ESTADO_JUEGO["escudo"] = ESTADO_JUEGO["max_escudo"]
-        mostrar_aviso("¡Escudo Recargable mejorado!")
+        mostrar_aviso(f"¡Escudo de Plasma Nivel {ESTADO_JUEGO['max_escudo']}!")
 
 def disparar_armas_jugador(cx, cy, target_x, target_y):
     dx, dy = target_x - cx, target_y - cy
+    dist = math.hypot(dx, dy)
+    if dist == 0:
+        return
     angulo_base = math.atan2(dy, dx)
-    vel_base = 14.0
+    vel_base = 14.0 + ESTADO_JUEGO["mejoras"].get("rafaga", 0) * 1.5
 
-    angulos = [angulo_base - 0.26, angulo_base, angulo_base + 0.26] if ESTADO_JUEGO["mejoras"]["triple"] else [angulo_base]
-    multiplicadores_rafaga = [1.0, 0.78, 0.56] if ESTADO_JUEGO["mejoras"]["rafaga"] else [1.0]
-    perforaciones = 3 if ESTADO_JUEGO["mejoras"]["perforante"] else 1
+    lv_multi = ESTADO_JUEGO["mejoras"].get("multidisparo", 0)
+    if lv_multi <= 0:
+        angulos = [angulo_base]
+    else:
+        num_balas = 1 + lv_multi * 2
+        apertura_total = min(1.3, 0.22 * num_balas)
+        paso = apertura_total / (num_balas - 1)
+        angulos = [angulo_base - apertura_total / 2.0 + paso * i for i in range(num_balas)]
+
+    lv_rafaga = ESTADO_JUEGO["mejoras"].get("rafaga", 0)
+    if lv_rafaga <= 0:
+        multiplicadores_rafaga = [1.0]
+    else:
+        cant_rafaga = min(7, 1 + lv_rafaga * 2)
+        multiplicadores_rafaga = [1.0 - i * 0.12 for i in range(cant_rafaga)]
+
+    lv_perf = ESTADO_JUEGO["mejoras"].get("perforante", 0)
+    perforaciones = 1 + lv_perf * 3
 
     for mult in multiplicadores_rafaga:
         vel = vel_base * mult
@@ -276,7 +334,8 @@ def aplicar_dano_jugador():
 def actualizar_entidades(px, py, tam_p, paredes):
     ahora = time.time()
     if ESTADO_JUEGO["max_escudo"] > 0 and ESTADO_JUEGO["escudo"] < ESTADO_JUEGO["max_escudo"]:
-        if ahora - ESTADO_JUEGO["ultimo_dano"] >= 5.0:
+        cd_recarga = max(1.8, 5.0 - ESTADO_JUEGO["max_escudo"] * 0.4)
+        if ahora - ESTADO_JUEGO["ultimo_dano"] >= cd_recarga:
             ESTADO_JUEGO["escudo"] += 1
             ESTADO_JUEGO["ultimo_dano"] = ahora
             mostrar_aviso("¡Escudo recargado!")
@@ -284,7 +343,7 @@ def actualizar_entidades(px, py, tam_p, paredes):
     radio_bala = 4
     nuevas_balas = []
 
-    # 1. Mover balas del jugador (+10 monedas por enemigo derrotado)
+    # 1. Mover balas del jugador
     for bx, by, vx, vy, perf in ESTADO_JUEGO["balas"]:
         nbx, nby = bx + vx, by + vy
         cercanas_b = obtener_paredes_en_rango(nbx, nby, radio_bala*2, radio_bala*2, paredes, radio=40, min_k=4)
@@ -298,9 +357,10 @@ def actualizar_entidades(px, py, tam_p, paredes):
             ex, ey, _ = ESTADO_JUEGO["enemigos"][i]
             if rect_colision(nbx - radio_bala, nby - radio_bala, radio_bala*2, radio_bala*2, ex, ey, tam_p, tam_p):
                 ESTADO_JUEGO["enemigos"].pop(i)
-                ESTADO_JUEGO["monedas"] += 10
+                oro_enemigo = 12 + ESTADO_JUEGO["nivel"] * 3
+                ESTADO_JUEGO["monedas"] += oro_enemigo
                 ESTADO_JUEGO["enemigos_derrotados_nivel"] += 1
-                mostrar_aviso("+10G (Enemigo derrotado)")
+                mostrar_aviso(f"+{oro_enemigo}G (Enemigo derrotado)")
                 perf -= 1
                 if perf <= 0:
                     break
@@ -332,12 +392,13 @@ def actualizar_entidades(px, py, tam_p, paredes):
 
     # 3. Mover enemigos y disparar
     vel_enemigo = 2.0
+    rad_v = obtener_radio_vision()
     for enemigo in ESTADO_JUEGO["enemigos"]:
         ex, ey, cd = enemigo
         dx, dy = px - ex, py - ey
         dist = math.hypot(dx, dy)
         
-        if 0 < dist < RADIO_VISION * 1.7:
+        if 0 < dist < rad_v * 1.5:
             vx = (dx / dist) * vel_enemigo
             vy = (dy / dist) * vel_enemigo
             cercanas_e = obtener_paredes_en_rango(ex, ey, tam_p, tam_p, paredes, radio=50, min_k=4)
@@ -417,14 +478,16 @@ def generar_imagen(request):
         if key and key.lower() != "r":
             jugador = Jugador(p)
             x_dest, y_dest = jugador.movimiento_personaje(key)
-            MAX_SPEED = 8
-            dx = max(-MAX_SPEED, min(MAX_SPEED, int(x_dest) - x_origen))
-            dy = max(-MAX_SPEED, min(MAX_SPEED, int(y_dest) - y_origen))
+            lv_vel = ESTADO_JUEGO["mejoras"].get("velocidad", 0)
+            max_speed = 8 + lv_vel * 2
+            dx = max(-max_speed, min(max_speed, int(x_dest) - x_origen))
+            dy = max(-max_speed, min(max_speed, int(y_dest) - y_origen))
             pasos = max(abs(dx), abs(dy))
+            rad_v = obtener_radio_vision()
             for i in range(1, pasos + 1):
                 sig_x = int(round(x_origen + (dx / pasos) * i))
                 sig_y = int(round(y_origen + (dy / pasos) * i))
-                paredes_cercanas = obtener_paredes_en_rango(sig_x, sig_y, tam_p, tam_p, paredes, radio=RADIO_VISION, min_k=4)
+                paredes_cercanas = obtener_paredes_en_rango(sig_x, sig_y, tam_p, tam_p, paredes, radio=rad_v, min_k=4)
                 if toca_pared(sig_x, sig_y, tam_p, tam_p, paredes_cercanas):
                     break
                 x_origen, y_origen = sig_x, sig_y
@@ -443,12 +506,14 @@ def generar_imagen(request):
             ESTADO_JUEGO["balas"].clear()
             ESTADO_JUEGO["balas_enemigas"].clear()
 
-        # Si toca el tesoro -> +100 monedas por el nivel y abre la tienda sobre el tablero
+        # Si toca el tesoro -> premio según el nivel y abre la tienda sobre el tablero
         gano = rect_colision(x_origen, y_origen, tam_p, tam_p, tx, ty, tam_t, tam_t)
         if gano:
-            ESTADO_JUEGO["monedas"] += 100
-            ESTADO_JUEGO["ultimo_premio_nivel"] = 100
-            ESTADO_JUEGO["ultimo_premio_enemigos"] = ESTADO_JUEGO["enemigos_derrotados_nivel"] * 10
+            premio_nivel = 100 + ESTADO_JUEGO["nivel"] * 25
+            premio_enemigos = ESTADO_JUEGO["enemigos_derrotados_nivel"] * (12 + ESTADO_JUEGO["nivel"] * 3)
+            ESTADO_JUEGO["monedas"] += premio_nivel
+            ESTADO_JUEGO["ultimo_premio_nivel"] = premio_nivel
+            ESTADO_JUEGO["ultimo_premio_enemigos"] = premio_enemigos
             ESTADO_JUEGO["nivel"] += 1
             ESTADO_JUEGO["en_tienda"] = True
             x_origen, y_origen = 8, 8
@@ -464,60 +529,71 @@ def generar_imagen(request):
     
     cx_p = int(x_origen + tam_p // 2)
     cy_p = int(y_origen + tam_p // 2)
+    rad_v = obtener_radio_vision()
 
-    cv2.circle(img, (cx_p, cy_p), RADIO_VISION, (28, 28, 32), -1)
-    cv2.circle(img, (cx_p, cy_p), int(RADIO_VISION * 0.65), (40, 40, 46), -1)
+    cv2.circle(img, (cx_p, cy_p), rad_v, (28, 28, 34), -1)
+    cv2.circle(img, (cx_p, cy_p), int(rad_v * 0.65), (42, 42, 50), -1)
+    cv2.circle(img, (cx_p, cy_p), int(rad_v * 0.35), (56, 56, 66), -1)
 
-    paredes_visibles = obtener_paredes_en_rango(x_origen, y_origen, tam_p, tam_p, paredes, radio=RADIO_VISION, min_k=4)
+    paredes_visibles = obtener_paredes_en_rango(x_origen, y_origen, tam_p, tam_p, paredes, radio=rad_v, min_k=4)
     for x1, y1, x2, y2 in paredes_visibles:
         cv2.line(img, (x1, y1), (x2, y2), color_pared, 3)
 
-    if math.hypot((tx + tam_t/2) - cx_p, (ty + tam_t/2) - cy_p) <= RADIO_VISION:
+    if math.hypot((tx + tam_t/2) - cx_p, (ty + tam_t/2) - cy_p) <= rad_v:
         pegar_sprite_seguro(img, sprite_t, tx, ty)
 
     pegar_sprite_seguro(img, sprite_p, x_origen, y_origen)
 
     if ESTADO_JUEGO["escudo"] > 0:
-        cv2.circle(img, (cx_p, cy_p), int(tam_p * 0.8), (255, 220, 0), 2)
+        cv2.circle(img, (cx_p, cy_p), int(tam_p * 0.85), (255, 220, 0), 2)
+        cv2.circle(img, (cx_p, cy_p), int(tam_p * 0.95), (255, 170, 0), 1)
 
     for ex, ey, _ in ESTADO_JUEGO["enemigos"]:
-        if math.hypot((ex + tam_p/2) - cx_p, (ey + tam_p/2) - cy_p) <= RADIO_VISION:
+        if math.hypot((ex + tam_p/2) - cx_p, (ey + tam_p/2) - cy_p) <= rad_v:
             ix, iy = int(ex), int(ey)
             cv2.rectangle(img, (ix, iy), (ix + tam_p, iy + tam_p), (40, 40, 230), -1)
             cv2.rectangle(img, (ix, iy), (ix + tam_p, iy + tam_p), (120, 120, 255), 2)
 
-    color_bala_j = (255, 230, 50) if ESTADO_JUEGO["mejoras"]["perforante"] else (0, 180, 255)
+    lv_perf = ESTADO_JUEGO["mejoras"].get("perforante", 0)
+    color_bala_j = (255, 230, 50) if lv_perf > 0 else (0, 190, 255)
+    tam_bala = 4 + min(4, lv_perf)
     for bx, by, _, _, _ in ESTADO_JUEGO["balas"]:
-        cv2.circle(img, (int(bx), int(by)), 5, color_bala_j, -1)
+        cv2.circle(img, (int(bx), int(by)), tam_bala, color_bala_j, -1)
+        if lv_perf > 0:
+            cv2.circle(img, (int(bx), int(by)), tam_bala + 2, (100, 255, 255), 1)
 
     for ebx, eby, _, _ in ESTADO_JUEGO["balas_enemigas"]:
-        if math.hypot(ebx - cx_p, eby - cy_p) <= RADIO_VISION * 1.2:
+        if math.hypot(ebx - cx_p, eby - cy_p) <= rad_v * 1.2:
             cv2.circle(img, (int(ebx), int(eby)), 4, (60, 60, 255), -1)
 
-    # HUD Superior
-    cv2.rectangle(img, (0, 0), (W, 38), (20, 20, 24), -1)
-    bonos_activos = [k.capitalize() for k, v in ESTADO_JUEGO["mejoras"].items() if v]
-    txt_bonos = ", ".join(bonos_activos) if bonos_activos else "Ninguno"
+    # HUD Superior OpenCV
+    cv2.rectangle(img, (0, 0), (W, 36), (18, 18, 22), -1)
+    bonos_activos = [f"{k[:4].capitalize()}:N{v}" for k, v in ESTADO_JUEGO["mejoras"].items() if v > 0]
+    txt_bonos = ", ".join(bonos_activos) if bonos_activos else "Nivel base"
     hud_texto = (
         f"Niv: {ESTADO_JUEGO['nivel']} | Vidas: {ESTADO_JUEGO['vidas']}/{ESTADO_JUEGO['max_vidas']} | "
         f"Escudo: {ESTADO_JUEGO['escudo']}/{ESTADO_JUEGO['max_escudo']} | "
-        f"Oro: {ESTADO_JUEGO['monedas']}G | Bonos: {txt_bonos}"
+        f"Oro: {ESTADO_JUEGO['monedas']}G | Mejoras: {txt_bonos}"
     )
-    cv2.putText(img, hud_texto, (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (230, 230, 230), 2)
+    cv2.putText(img, hud_texto, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (230, 230, 230), 2)
 
     if time.time() < ESTADO_JUEGO["tiempo_mensaje"]:
-        cv2.putText(img, ESTADO_JUEGO["mensaje_hud"], (320, 480), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 230, 255), 2)
+        cv2.putText(img, ESTADO_JUEGO["mensaje_hud"], (300, 480), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 230, 255), 2)
 
     ok, buffer = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
     response = HttpResponse(buffer.tobytes(), content_type="image/jpg")
     
-    # Cabeceras para que el HTML sepa cuándo abrir las tarjetas de la tienda y cuánto dinero mostrar
     response["X-En-Tienda"] = "1" if ESTADO_JUEGO["en_tienda"] else "0"
     response["X-Monedas"] = str(ESTADO_JUEGO["monedas"])
     response["X-Nivel"] = str(ESTADO_JUEGO["nivel"])
+    response["X-Vidas"] = str(ESTADO_JUEGO["vidas"])
+    response["X-Max-Vidas"] = str(ESTADO_JUEGO["max_vidas"])
+    response["X-Escudo"] = str(ESTADO_JUEGO["escudo"])
+    response["X-Max-Escudo"] = str(ESTADO_JUEGO["max_escudo"])
     response["X-Premio-Nivel"] = str(ESTADO_JUEGO["ultimo_premio_nivel"])
     response["X-Premio-Enemigos"] = str(ESTADO_JUEGO["ultimo_premio_enemigos"])
     response["X-Kills"] = str(ESTADO_JUEGO["enemigos_derrotados_nivel"])
+    response["X-Info-Tienda"] = json.dumps(obtener_resumen_tienda())
     response["Cache-Control"] = "no-store"
     return response
 

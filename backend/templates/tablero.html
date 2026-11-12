@@ -3,48 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laberinto Oscuro - Tablero</title>
+    <title>Laberinto Oscuro - Roguelite</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body {
-            background-color: #121215;
-            color: #f4f4f5;
-            font-family: system-ui, -apple-system, sans-serif;
+            background: radial-gradient(ellipse at 50% 10%, #1e1b4b 0%, #0f172a 45%, #080a10 100%);
+            color: #f8fafc;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             margin: 0;
+            padding: 14px 10px;
             user-select: none;
+            overflow-x: hidden;
         }
-        h2 {
-            margin: 6px 0;
-            font-size: 1.35rem;
+
+        /* --- CABECERA Y TÍTULO --- */
+        .header-juego {
+            text-align: center;
+            margin-bottom: 8px;
         }
-        .controles {
-            margin-bottom: 10px;
-            font-size: 0.85rem;
-            color: #a1a1aa;
-            background: #1f1f23;
-            padding: 6px 14px;
-            border-radius: 6px;
-            border: 1px solid #2e2e36;
+        .header-juego h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 25px rgba(129, 140, 248, 0.4);
         }
-        .controles span {
+        .controles-leyenda {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        .pill-control {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: #cbd5e1;
+            font-size: 0.76rem;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            backdrop-filter: blur(4px);
+        }
+        .pill-control span {
             color: #fbbf24;
-            font-weight: bold;
+            font-weight: 700;
         }
+
+        /* --- BARRA HUD SUPERIOR HTML --- */
+        .hud-stats-bar {
+            width: min(1000px, 96vw);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            border-bottom: none;
+            border-radius: 12px 12px 0 0;
+            padding: 8px 16px;
+            font-size: 0.86rem;
+            backdrop-filter: blur(8px);
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .hud-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+        }
+        .badge-nivel {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: #fff;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+        }
+        .badge-vidas {
+            color: #f43f5e;
+            font-size: 0.95rem;
+            letter-spacing: 1px;
+        }
+        .badge-escudo {
+            color: #38bdf8;
+            font-weight: 700;
+        }
+        .badge-oro {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            font-weight: 800;
+        }
+        .mejoras-activas-chips {
+            display: flex;
+            gap: 6px;
+            font-size: 0.72rem;
+            flex-wrap: wrap;
+        }
+        .chip-mejora {
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            color: #7dd3fc;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        /* --- CONTENEDOR DEL JUEGO --- */
         #contenedor-juego {
             position: relative;
             width: min(1000px, 96vw);
             aspect-ratio: 1000 / 500;
             height: auto;
-            border: 3px solid #3f3f46;
-            border-radius: 10px;
+            border: 2px solid rgba(99, 102, 241, 0.45);
+            border-radius: 0 0 14px 14px;
             overflow: hidden;
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
-            background: #0c0c0c;
-            /* Oculta el puntero nativo para que solo se vea la mira personalizada */
+            box-shadow: 0 0 35px rgba(99, 102, 241, 0.25), 0 20px 45px rgba(0, 0, 0, 0.95);
+            background: #08080c;
             cursor: none;
             touch-action: none;
         }
@@ -55,30 +144,28 @@
             display: block;
         }
 
-        /* --- MIRA PERSONALIZADA DE ALTA VISIBILIDAD --- */
+        /* --- MIRA TÁCTICA DE ALTA PRECISIÓN --- */
         #mira-cursor {
             position: absolute;
             top: 0;
             left: 0;
             width: 32px;
             height: 32px;
-            pointer-events: none; /* No bloquea los clics en el canvas */
+            pointer-events: none;
             z-index: 15;
             display: none;
             will-change: transform;
             transform: translate(-50%, -50%);
         }
-        /* Círculo exterior brillante con sombra neón */
         #mira-cursor::before {
             content: "";
             position: absolute;
             inset: 0;
-            border: 2px solid #00f0ff;
+            border: 2px solid #38bdf8;
             border-radius: 50%;
-            box-shadow: 0 0 8px #00f0ff, inset 0 0 4px #00f0ff;
+            box-shadow: 0 0 10px #38bdf8, inset 0 0 5px #38bdf8;
             box-sizing: border-box;
         }
-        /* Punto central amarillo de máxima precisión */
         #mira-cursor::after {
             content: "";
             position: absolute;
@@ -89,16 +176,15 @@
             background: #fbbf24;
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            box-shadow: 0 0 6px #fbbf24;
+            box-shadow: 0 0 8px #fbbf24;
         }
-        /* Rayas de la cruz táctica */
         .mira-eje-h {
             position: absolute;
             top: 50%;
             left: -6px;
             right: -6px;
             height: 2px;
-            background: rgba(0, 240, 255, 0.7);
+            background: rgba(56, 189, 248, 0.75);
             transform: translateY(-50%);
             pointer-events: none;
         }
@@ -108,7 +194,7 @@
             top: -6px;
             bottom: -6px;
             width: 2px;
-            background: rgba(0, 240, 255, 0.7);
+            background: rgba(56, 189, 248, 0.75);
             transform: translateX(-50%);
             pointer-events: none;
         }
@@ -117,201 +203,255 @@
             position: absolute;
             top: 10px;
             right: 10px;
-            background: rgba(220, 38, 38, 0.9);
+            background: rgba(220, 38, 38, 0.95);
             color: white;
-            padding: 6px 12px;
+            padding: 6px 14px;
             border-radius: 6px;
             font-size: 0.8rem;
             display: none;
             z-index: 30;
+            font-weight: 600;
         }
-        /* Modal de Tienda con Tarjetas sobre el tablero */
+
+        /* --- OVERLAY DE LA TIENDA ROGUELITE --- */
         #overlay-tienda {
             position: absolute;
             inset: 0;
-            background: rgba(10, 10, 14, 0.92);
-            backdrop-filter: blur(4px);
+            background: rgba(9, 11, 20, 0.95);
+            backdrop-filter: blur(8px);
             display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 16px;
             z-index: 20;
-            cursor: default; /* El cursor vuelve a la normalidad en el menú de tienda */
+            cursor: default;
+            animation: fadeIn 0.2s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
         }
         #overlay-tienda.activo {
             display: flex;
         }
         .titulo-tesoro {
-            font-size: 1.6rem;
-            font-weight: 800;
-            color: #fbbf24;
-            margin: 0 0 6px 0;
+            font-size: 1.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0 0 4px 0;
+            text-align: center;
+        }
+        .subtitulo-tienda {
+            font-size: 0.82rem;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            text-align: center;
         }
         .resumen-oro {
-            background: #1f1f26;
-            border: 1px solid #3f3f46;
-            border-radius: 8px;
-            padding: 8px 18px;
-            font-size: 0.9rem;
-            color: #e4e4e7;
-            margin-bottom: 18px;
+            background: rgba(30, 41, 59, 0.75);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 10px;
+            padding: 6px 16px;
+            font-size: 0.84rem;
+            color: #e2e8f0;
+            margin-bottom: 14px;
             display: flex;
-            gap: 18px;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         .resumen-oro b {
             color: #4ade80;
         }
         .oro-total {
             color: #fbbf24 !important;
-            font-size: 1rem;
+            font-size: 0.95rem;
         }
+
+        /* Cuadrícula de tarjetas de mejora */
         .grid-tarjetas {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 12px;
-            width: 95%;
-            max-width: 940px;
-            margin-bottom: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+            width: 100%;
+            max-width: 950px;
+            margin-bottom: 16px;
+            max-height: 56vh;
+            overflow-y: auto;
+            padding: 4px;
         }
         .tarjeta {
-            background: linear-gradient(180deg, #272730 0%, #1c1c22 100%);
-            border: 2px solid #3f3f46;
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 2px solid rgba(100, 116, 139, 0.3);
             border-radius: 10px;
-            padding: 14px 10px;
+            padding: 10px 8px;
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
-            cursor: pointer;
-            transition: transform 0.15s, border-color 0.15s;
+            transition: all 0.18s ease;
+            position: relative;
         }
         .tarjeta:hover {
-            transform: translateY(-4px);
+            transform: translateY(-3px);
             border-color: #fbbf24;
+            box-shadow: 0 8px 20px rgba(251, 191, 36, 0.18);
+        }
+        .tarjeta-nivel-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: #4f46e5;
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
         }
         .tarjeta-icono {
-            font-size: 1.8rem;
-            margin-bottom: 6px;
+            font-size: 1.6rem;
+            margin-bottom: 4px;
+            margin-top: 4px;
         }
         .tarjeta-nombre {
-            font-weight: 700;
-            font-size: 0.92rem;
-            color: #f4f4f5;
-            margin-bottom: 6px;
+            font-weight: 800;
+            font-size: 0.84rem;
+            color: #f8fafc;
+            margin-bottom: 4px;
         }
         .tarjeta-desc {
-            font-size: 0.75rem;
-            color: #a1a1aa;
-            margin-bottom: 12px;
-            line-height: 1.3;
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            line-height: 1.25;
             flex-grow: 1;
         }
-        .tarjeta-precio {
-            background: #fbbf24;
-            color: #18181b;
-            font-weight: 800;
-            font-size: 0.82rem;
-            padding: 5px 12px;
-            border-radius: 6px;
-            width: 80%;
+        .tarjeta-desc b {
+            color: #38bdf8;
         }
-        .btn-continuar {
-            background: #22c55e;
-            color: #052e16;
+        .btn-comprar {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #0f172a;
             font-weight: 800;
-            font-size: 1rem;
-            padding: 10px 28px;
+            font-size: 0.78rem;
+            padding: 6px 10px;
+            border-radius: 6px;
+            width: 100%;
             border: none;
-            border-radius: 8px;
             cursor: pointer;
-            transition: background 0.15s;
+            transition: transform 0.12s, filter 0.12s;
+        }
+        .btn-comprar:hover {
+            filter: brightness(1.15);
+            transform: scale(1.02);
+        }
+        .btn-comprar.sin-oro {
+            background: #334155;
+            color: #64748b;
+            cursor: not-allowed;
+            filter: none;
+            transform: none;
+        }
+
+        .btn-continuar {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #ffffff;
+            font-weight: 900;
+            font-size: 1rem;
+            padding: 10px 32px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+            transition: all 0.15s ease;
         }
         .btn-continuar:hover {
-            background: #4ade80;
+            filter: brightness(1.15);
+            transform: scale(1.03);
+            box-shadow: 0 0 28px rgba(34, 197, 94, 0.6);
         }
-        .acciones {
+
+        /* --- BOTONES INFERIORES --- */
+        .acciones-inferiores {
             margin-top: 12px;
             display: flex;
             gap: 12px;
-        }
-        .btn {
-            padding: 8px 16px;
-            background-color: #3f3f46;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-        }
-        .btn-reiniciar {
-            background-color: #ef4444;
-        }
-
-        /* --- CONTROLES TÁCTILES PARA MÓVILES / TABLETS --- */
-        .controles-tactiles {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 24px;
-            margin-top: 14px;
-            margin-bottom: 10px;
-            user-select: none;
-            -webkit-user-select: none;
             flex-wrap: wrap;
-        }
-        .dpad {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-        }
-        .dpad-mid {
-            display: flex;
-            gap: 6px;
-        }
-        .btn-touch {
-            background-color: #27272a;
-            color: #f4f4f5;
-            border: 2px solid #3f3f46;
-            border-radius: 8px;
-            font-size: 1.15rem;
-            font-weight: bold;
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
             justify-content: center;
+        }
+        .btn-accion {
+            padding: 8px 18px;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            color: #f1f5f9;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 700;
             cursor: pointer;
-            touch-action: manipulation;
-            transition: background-color 0.1s, transform 0.1s;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
-        .btn-touch:active {
-            background-color: #4f46e5;
-            border-color: #6366f1;
-            transform: scale(0.95);
+        .btn-accion:hover {
+            background: rgba(51, 65, 85, 0.95);
+            border-color: #818cf8;
+            transform: translateY(-1px);
         }
-        .btn-touch-action {
-            width: auto;
-            padding: 0 16px;
-            height: 48px;
-            font-size: 0.9rem;
+        .btn-accion-reiniciar {
+            background: rgba(225, 29, 72, 0.2);
+            border-color: rgba(225, 29, 72, 0.4);
+            color: #fda4af;
+        }
+        .btn-accion-reiniciar:hover {
+            background: rgba(225, 29, 72, 0.4);
+            border-color: #f43f5e;
+            color: #fff;
         }
     </style>
 </head>
 <body>
 
-    <h2>Laberinto Oscuro</h2>
-    <div class="controles">
-        Mover: <span>W, A, S, D</span> | Disparar: <span>Clic Izquierdo</span> | Reiniciar Nivel 1: <span>R</span>
+    <!-- CABECERA PRINCIPAL -->
+    <div class="header-juego">
+        <h1>⚡ LABERINTO OSCURO</h1>
+        <div class="controles-leyenda">
+            <div class="pill-control">Moverse: <span>W, A, S, D</span></div>
+            <div class="pill-control">Apuntar y Disparar: <span>Clic Izquierdo</span></div>
+            <div class="pill-control">Reiniciar Partida: <span>R</span></div>
+        </div>
     </div>
 
+    <!-- BARRA HUD SUPERIOR -->
+    <div class="hud-stats-bar">
+        <div class="hud-item">
+            <span class="badge-nivel" id="top-nivel-badge">PISO 1</span>
+        </div>
+        <div class="hud-item">
+            <span>Salud:</span>
+            <span class="badge-vidas" id="top-vidas">❤️❤️❤️</span>
+        </div>
+        <div class="hud-item">
+            <span>Escudo:</span>
+            <span class="badge-escudo" id="top-escudo">🛡️ 0</span>
+        </div>
+        <div class="hud-item">
+            <span class="badge-oro" id="top-oro">🪙 0 G</span>
+        </div>
+        <div class="hud-item mejoras-activas-chips" id="top-chips-mejoras">
+            <!-- Chips de mejoras activas se inyectan dinámicamente -->
+        </div>
+    </div>
+
+    <!-- CANVAS DEL JUEGO -->
     <div id="contenedor-juego">
         <img id="mapa" src="/api/generar-imagen" alt="Cargando tablero..." draggable="false">
         
-        <!-- Elemento de la Mira Táctica -->
+        <!-- Mira Táctica -->
         <div id="mira-cursor">
             <div class="mira-eje-h"></div>
             <div class="mira-eje-v"></div>
@@ -319,75 +459,92 @@
 
         <div id="estado-error"></div>
 
-        <!-- Tienda en Tarjetas sobre el tablero -->
+        <!-- MODAL TIENDA ROGUELITE -->
         <div id="overlay-tienda">
-            <div class="titulo-tesoro">¡TESORO ENCONTRADO!</div>
+            <div class="titulo-tesoro">🏆 ¡TESORO ENCONTRADO!</div>
+            <div class="subtitulo-tienda">Tienda de Mejoras — Mientras más mejoras compres, más lejos llegarás</div>
+
             <div class="resumen-oro">
-                <span>Tesoro del Nivel: <b>+<span id="lbl-premio-nivel">100</span>G</b></span>
-                <span>Enemigos derrotados (<span id="lbl-kills">0</span>): <b>+<span id="lbl-premio-enemigos">0</span>G</b></span>
+                <span>Tesoro del Piso: <b>+<span id="lbl-premio-nivel">100</span>G</b></span>
+                <span>Enemigos (<span id="lbl-kills">0</span>): <b>+<span id="lbl-premio-enemigos">0</span>G</b></span>
                 <span>Oro Disponible: <b class="oro-total"><span id="lbl-monedas">0</span>G</b></span>
             </div>
 
             <div class="grid-tarjetas">
-                <div class="tarjeta" onclick="comprarItem('triple')">
+                <!-- 1. Multidisparo -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-multi">Nv. 0</span>
                     <div class="tarjeta-icono">🔱</div>
-                    <div class="tarjeta-nombre">Disparo Triple</div>
-                    <div class="tarjeta-desc">Dispara 3 bolas en abanico por cada clic.</div>
-                    <div class="tarjeta-precio">100 G</div>
+                    <div class="tarjeta-nombre">Disparo Múltiple</div>
+                    <div class="tarjeta-desc" id="desc-multi">Dispara en abanico.<br>Siguiente: <b>3 proyectiles</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-multi" onclick="comprarItem('multidisparo')">80 G</button>
                 </div>
 
-                <div class="tarjeta" onclick="comprarItem('rafaga')">
+                <!-- 2. Ráfaga -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-rafaga">Nv. 0</span>
                     <div class="tarjeta-icono">☄️</div>
-                    <div class="tarjeta-nombre">Ráfaga x3</div>
-                    <div class="tarjeta-desc">Lanza una ráfaga de 3 proyectiles seguidos.</div>
-                    <div class="tarjeta-precio">120 G</div>
+                    <div class="tarjeta-nombre">Ráfaga Rápida</div>
+                    <div class="tarjeta-desc" id="desc-rafaga">Ráfagas de proyectiles.<br>Siguiente: <b>x3 disparos</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-rafaga" onclick="comprarItem('rafaga')">90 G</button>
                 </div>
 
-                <div class="tarjeta" onclick="comprarItem('perforante')">
+                <!-- 3. Perforante -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-perf">Nv. 0</span>
                     <div class="tarjeta-icono">⚡</div>
                     <div class="tarjeta-nombre">Bala Perforante</div>
-                    <div class="tarjeta-desc">Atraviesa enemigos y hasta 1 pared cercana.</div>
-                    <div class="tarjeta-precio">150 G</div>
+                    <div class="tarjeta-desc" id="desc-perf">Atraviesa muros y enemigos.<br>Siguiente: <b>3 impactos</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-perf" onclick="comprarItem('perforante')">100 G</button>
                 </div>
 
-                <div class="tarjeta" onclick="comprarItem('vida')">
-                    <div class="tarjeta-icono">❤️</div>
-                    <div class="tarjeta-nombre">+1 Vida Máx</div>
-                    <div class="tarjeta-desc">Aumenta tu salud máxima y recupera 1 punto.</div>
-                    <div class="tarjeta-precio">60 G</div>
+                <!-- 4. Botas de Velocidad -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-vel">Nv. 0</span>
+                    <div class="tarjeta-icono">👟</div>
+                    <div class="tarjeta-nombre">Botas Veloces</div>
+                    <div class="tarjeta-desc" id="desc-vel">Desplazamiento ágil.<br>Siguiente: <b>+20% Velocidad</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-vel" onclick="comprarItem('velocidad')">60 G</button>
                 </div>
 
-                <div class="tarjeta" onclick="comprarItem('escudo')">
+                <!-- 5. Linterna Táctica -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-vis">Nv. 0</span>
+                    <div class="tarjeta-icono">💡</div>
+                    <div class="tarjeta-nombre">Linterna Táctica</div>
+                    <div class="tarjeta-desc" id="desc-vis">Visión en la penumbra.<br>Siguiente: <b>+25px Radio</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-vis" onclick="comprarItem('vision')">50 G</button>
+                </div>
+
+                <!-- 6. Escudo de Plasma -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-escudo">Nv. 0</span>
                     <div class="tarjeta-icono">🛡️</div>
-                    <div class="tarjeta-nombre">Escudo Recargable</div>
-                    <div class="tarjeta-desc">Bloquea daño y se recarga tras 5s sin golpes.</div>
-                    <div class="tarjeta-precio">90 G</div>
+                    <div class="tarjeta-nombre">Escudo Plasma</div>
+                    <div class="tarjeta-desc" id="desc-escudo">Absorbe daño y recarga.<br>Siguiente: <b>+1 Escudo máx</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-escudo" onclick="comprarItem('escudo')">75 G</button>
+                </div>
+
+                <!-- 7. Vida Máxima -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-vida">Nv. 3</span>
+                    <div class="tarjeta-icono">❤️</div>
+                    <div class="tarjeta-nombre">Corazón Vital</div>
+                    <div class="tarjeta-desc" id="desc-vida">Salud máxima y cura.<br>Siguiente: <b>+1 Vida máx</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-vida" onclick="comprarItem('vida')">60 G</button>
                 </div>
             </div>
 
             <button class="btn-continuar" onclick="empezarSiguienteNivel()">
-                Empezar Nivel <span id="lbl-sig-nivel">2</span> ▶
+                Continuar al Piso <span id="lbl-sig-nivel">2</span> ▶
             </button>
         </div>
     </div>
 
-    <div id="controles-tactiles" class="controles-tactiles">
-        <div class="dpad">
-            <button type="button" class="btn-touch btn-dpad" data-key="w">▲</button>
-            <div class="dpad-mid">
-                <button type="button" class="btn-touch btn-dpad" data-key="a">◄</button>
-                <button type="button" class="btn-touch btn-dpad" data-key="s">▼</button>
-                <button type="button" class="btn-touch btn-dpad" data-key="d">►</button>
-            </div>
-        </div>
-        <div class="touch-actions">
-            <button type="button" class="btn-touch btn-touch-action" onclick="reiniciarJuego()">🔄 Reiniciar (R)</button>
-        </div>
-    </div>
-
-    <div class="acciones">
-        <a href="/api/seleccion-personaje" class="btn">Cambiar Personaje</a>
-        <button class="btn btn-reiniciar" onclick="reiniciarJuego()">Reiniciar Partida (R)</button>
+    <!-- BOTONES INFERIORES -->
+    <div class="acciones-inferiores">
+        <a href="/api/seleccion-personaje" class="btn-accion">👤 Cambiar Personaje</a>
+        <button class="btn-accion btn-accion-reiniciar" onclick="reiniciarJuego()">🔄 Reiniciar Partida (R)</button>
     </div>
 
     <script>
@@ -406,13 +563,11 @@
         let cargandoFrame = false;
         let urlAnterior = null;
 
-        // --- SEGUIMIENTO ULTRA FLUIDO DE LA MIRA ---
+        // Seguimiento fluido de la mira táctica
         contenedor.addEventListener("mousemove", function(e) {
             const rect = contenedor.getBoundingClientRect();
             const posX = e.clientX - rect.left;
             const posY = e.clientY - rect.top;
-            
-            // Usa transform para aceleración por GPU sin retrasos
             mira.style.transform = `translate3d(${posX - 16}px, ${posY - 16}px, 0)`;
             mira.style.display = "block";
         });
@@ -421,6 +576,7 @@
             mira.style.display = "none";
         });
 
+        // Controles de teclado WASD y R
         window.addEventListener("keydown", function(e) {
             const k = e.key.toLowerCase();
             if (["w", "a", "s", "d", "r"].includes(k)) {
@@ -435,6 +591,7 @@
             }
         });
 
+        // Disparo con clic del ratón
         imgMapa.addEventListener("mousedown", function(e) {
             if (e.button !== 0) return;
             const rect = imgMapa.getBoundingClientRect();
@@ -443,6 +600,7 @@
             clickPendiente = { mx, my };
         });
 
+        // Disparo por toque en pantallas táctiles
         imgMapa.addEventListener("touchstart", function(e) {
             if (e.touches && e.touches.length > 0) {
                 const t = e.touches[0];
@@ -452,18 +610,6 @@
                 clickPendiente = { mx, my };
             }
         }, { passive: true });
-
-        // Eventos para botones táctiles D-Pad
-        document.querySelectorAll(".btn-dpad").forEach(btn => {
-            const k = btn.dataset.key;
-            const presionar = (e) => { e.preventDefault(); teclaActiva = k; };
-            const soltar = (e) => { e.preventDefault(); if (teclaActiva === k) teclaActiva = ""; };
-            btn.addEventListener("touchstart", presionar, { passive: false });
-            btn.addEventListener("touchend", soltar, { passive: false });
-            btn.addEventListener("mousedown", presionar);
-            btn.addEventListener("mouseup", soltar);
-            btn.addEventListener("mouseleave", soltar);
-        });
 
         function comprarItem(item) {
             compraPendiente = item;
@@ -475,6 +621,95 @@
 
         function reiniciarJuego() {
             teclaActiva = "r";
+        }
+
+        function renderizarHUDyTienda(infoStr, monedas, nivel, vidas, maxVidas, escudo, maxEscudo) {
+            // Actualizar HUD superior
+            document.getElementById("top-nivel-badge").textContent = `PISO ${nivel}`;
+            
+            // Corazones
+            let corazones = "";
+            const vActual = parseInt(vidas) || 0;
+            const vMax = parseInt(maxVidas) || 3;
+            for (let i = 0; i < vMax; i++) {
+                corazones += (i < vActual) ? "❤️" : "🖤";
+            }
+            document.getElementById("top-vidas").textContent = `${corazones} (${vActual}/${vMax})`;
+            
+            // Escudo
+            document.getElementById("top-escudo").textContent = `🛡️ ${escudo}/${maxEscudo}`;
+            document.getElementById("top-oro").textContent = `🪙 ${monedas} G`;
+
+            if (!infoStr) return;
+            let info;
+            try {
+                info = JSON.parse(infoStr);
+            } catch (e) {
+                return;
+            }
+
+            // Chips de mejoras activas en el HUD
+            const chipsCont = document.getElementById("top-chips-mejoras");
+            chipsCont.innerHTML = "";
+            const mapaIconos = {
+                "multidisparo": "🔱 Multi",
+                "rafaga": "☄️ Ráfaga",
+                "perforante": "⚡ Perforante",
+                "velocidad": "👟 Vel",
+                "vision": "💡 Visión",
+            };
+            for (const [key, icono] of Object.entries(mapaIconos)) {
+                if (info[key] && info[key].nivel > 0) {
+                    const span = document.createElement("span");
+                    span.className = "chip-mejora";
+                    span.textContent = `${icono} Nv.${info[key].nivel}`;
+                    chipsCont.appendChild(span);
+                }
+            }
+
+            const oroNum = parseInt(monedas) || 0;
+
+            // Función para actualizar cada tarjeta de la tienda
+            function updateCard(btnId, badgeId, descId, itemKey, descSigFn) {
+                const item = info[itemKey];
+                if (!item) return;
+                const btn = document.getElementById(btnId);
+                const badge = document.getElementById(badgeId);
+                const desc = document.getElementById(descId);
+
+                if (badge) badge.textContent = `Nv. ${item.nivel}`;
+                if (desc) desc.innerHTML = descSigFn(item.nivel);
+
+                if (btn) {
+                    btn.textContent = `${item.costo} G`;
+                    if (oroNum < item.costo) {
+                        btn.classList.add("sin-oro");
+                    } else {
+                        btn.classList.remove("sin-oro");
+                    }
+                }
+            }
+
+            updateCard("btn-compra-multi", "badge-lv-multi", "desc-multi", "multidisparo", 
+                (lv) => `Dispara en abanico.<br>Siguiente: <b>${1 + (lv + 1) * 2} proyectiles</b>`);
+            
+            updateCard("btn-compra-rafaga", "badge-lv-rafaga", "desc-rafaga", "rafaga", 
+                (lv) => `Ráfagas rápidas de balas.<br>Siguiente: <b>x${Math.min(7, 1 + (lv + 1) * 2)} ráfaga</b>`);
+
+            updateCard("btn-compra-perf", "badge-lv-perf", "desc-perf", "perforante", 
+                (lv) => `Atraviesa muros y enemigos.<br>Siguiente: <b>${1 + (lv + 1) * 3} impactos</b>`);
+
+            updateCard("btn-compra-vel", "badge-lv-vel", "desc-vel", "velocidad", 
+                (lv) => `Desplazamiento ágil.<br>Siguiente: <b>+${(lv + 1) * 20}% Velocidad</b>`);
+
+            updateCard("btn-compra-vis", "badge-lv-vis", "desc-vis", "vision", 
+                (lv) => `Radio de la linterna.<br>Siguiente: <b>+${(lv + 1) * 25}px Luz</b>`);
+
+            updateCard("btn-compra-escudo", "badge-lv-escudo", "desc-escudo", "escudo", 
+                (lv) => `Absorbe daño y recarga.<br>Siguiente: <b>+1 Escudo (${lv + 1})</b>`);
+
+            updateCard("btn-compra-vida", "badge-lv-vida", "desc-vida", "vida", 
+                (lv) => `Salud máxima y cura 1❤️.<br>Siguiente: <b>${lv + 1} Corazones</b>`);
         }
 
         async function actualizarFrame() {
@@ -508,13 +743,20 @@
                     const enTienda = resp.headers.get("X-En-Tienda") === "1";
                     const monedas = resp.headers.get("X-Monedas") || "0";
                     const nivel = resp.headers.get("X-Nivel") || "1";
+                    const vidas = resp.headers.get("X-Vidas") || "3";
+                    const maxVidas = resp.headers.get("X-Max-Vidas") || "3";
+                    const escudo = resp.headers.get("X-Escudo") || "0";
+                    const maxEscudo = resp.headers.get("X-Max-Escudo") || "0";
                     const premioNiv = resp.headers.get("X-Premio-Nivel") || "100";
                     const premioEnem = resp.headers.get("X-Premio-Enemigos") || "0";
                     const kills = resp.headers.get("X-Kills") || "0";
+                    const infoTienda = resp.headers.get("X-Info-Tienda") || "";
+
+                    renderizarHUDyTienda(infoTienda, monedas, nivel, vidas, maxVidas, escudo, maxEscudo);
 
                     if (enTienda) {
                         overlayTienda.classList.add("activo");
-                        mira.style.display = "none"; // Oculta la mira táctica durante la tienda
+                        mira.style.display = "none";
                         document.getElementById("lbl-monedas").textContent = monedas;
                         document.getElementById("lbl-sig-nivel").textContent = nivel;
                         document.getElementById("lbl-premio-nivel").textContent = premioNiv;
