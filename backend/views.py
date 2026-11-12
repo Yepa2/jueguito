@@ -566,22 +566,11 @@ def generar_imagen(request):
         if math.hypot(ebx - cx_p, eby - cy_p) <= rad_v * 1.2:
             cv2.circle(img, (int(ebx), int(eby)), 4, (60, 60, 255), -1)
 
-    # HUD Superior OpenCV
-    cv2.rectangle(img, (0, 0), (W, 36), (18, 18, 22), -1)
-    bonos_activos = [f"{k[:4].capitalize()}:N{v}" for k, v in ESTADO_JUEGO["mejoras"].items() if v > 0]
-    txt_bonos = ", ".join(bonos_activos) if bonos_activos else "Nivel base"
-    hud_texto = (
-        f"Niv: {ESTADO_JUEGO['nivel']} | Vidas: {ESTADO_JUEGO['vidas']}/{ESTADO_JUEGO['max_vidas']} | "
-        f"Escudo: {ESTADO_JUEGO['escudo']}/{ESTADO_JUEGO['max_escudo']} | "
-        f"Oro: {ESTADO_JUEGO['monedas']}G | Mejoras: {txt_bonos}"
-    )
-    cv2.putText(img, hud_texto, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (230, 230, 230), 2)
-
-    if time.time() < ESTADO_JUEGO["tiempo_mensaje"]:
-        cv2.putText(img, ESTADO_JUEGO["mensaje_hud"], (300, 480), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 230, 255), 2)
-
     ok, buffer = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
     response = HttpResponse(buffer.tobytes(), content_type="image/jpg")
+    
+    msg_hud = ESTADO_JUEGO["mensaje_hud"] if time.time() < ESTADO_JUEGO["tiempo_mensaje"] else ""
+    response["X-Mensaje-HUD"] = msg_hud
     
     response["X-En-Tienda"] = "1" if ESTADO_JUEGO["en_tienda"] else "0"
     response["X-Monedas"] = str(ESTADO_JUEGO["monedas"])
