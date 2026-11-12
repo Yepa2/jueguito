@@ -314,15 +314,40 @@
             font-size: 0.95rem;
         }
 
+        /* Leyenda de enemigos por colores y vidas */
+        .leyenda-enemigos {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            font-size: 0.72rem;
+        }
+        .enem-tag {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 3px 9px;
+            border-radius: 9999px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .tag-rojo { border-color: rgba(239, 68, 68, 0.55); color: #fca5a5; }
+        .tag-naranja { border-color: rgba(249, 115, 22, 0.55); color: #fdba74; }
+        .tag-morado { border-color: rgba(168, 85, 247, 0.55); color: #d8b4fe; }
+        .tag-verde { border-color: rgba(34, 197, 94, 0.55); color: #86efac; box-shadow: 0 0 8px rgba(34, 197, 94, 0.2); }
+        .tag-dorado { border-color: rgba(234, 179, 8, 0.75); color: #fde047; box-shadow: 0 0 10px rgba(234, 179, 8, 0.3); }
+
         /* Cuadrícula de tarjetas de mejora */
         .grid-tarjetas {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
             gap: 10px;
             width: 100%;
-            max-width: 960px;
-            margin-bottom: 16px;
-            max-height: 56vh;
+            max-width: 1080px;
+            margin-bottom: 14px;
+            max-height: 54vh;
             overflow-y: auto;
             padding: 4px;
         }
@@ -477,6 +502,7 @@
             <div class="pill-control">Moverse: <span>W, A, S, D</span></div>
             <div class="pill-control">Apuntar y Disparar: <span>Clic Izquierdo</span></div>
             <div class="pill-control">Reiniciar Partida: <span>R</span></div>
+            <div class="pill-control">Enemigos: <span>🔴1HP</span> · <span>🟠3HP</span> · <span>🟣6HP</span> · <span>🟢10HP</span> · <span>👑Jefe</span></div>
         </div>
     </div>
 
@@ -527,8 +553,26 @@
                 <span>Oro Disponible: <b class="oro-total"><span id="lbl-monedas">0</span>G</b></span>
             </div>
 
+            <!-- Leyenda de colores y resistencia -->
+            <div class="leyenda-enemigos">
+                <span class="enem-tag tag-rojo">🔴 Rojo: 1 HP (Muere de 1 impacto)</span>
+                <span class="enem-tag tag-naranja">🟠 Naranja: 3 HP (Ágil)</span>
+                <span class="enem-tag tag-morado">🟣 Morado: 6 HP (Blindado)</span>
+                <span class="enem-tag tag-verde">🟢 Verde: 10 HP (Tanque con barra de vida)</span>
+                <span class="enem-tag tag-dorado">👑 Jefe: 20+ HP (Gran botín)</span>
+            </div>
+
             <div class="grid-tarjetas">
-                <!-- 1. Multidisparo -->
+                <!-- 1. Daño Letal -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-dano">Nv. 0</span>
+                    <div class="tarjeta-icono">💥</div>
+                    <div class="tarjeta-nombre">Daño Letal</div>
+                    <div class="tarjeta-desc" id="desc-dano">Potencia cada proyectil.<br>Siguiente: <b>+2 Daño/bala</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-dano" onclick="comprarItem('dano')">110 G</button>
+                </div>
+
+                <!-- 2. Multidisparo -->
                 <div class="tarjeta">
                     <span class="tarjeta-nivel-badge" id="badge-lv-multi">Nv. 0</span>
                     <div class="tarjeta-icono">🔱</div>
@@ -537,7 +581,34 @@
                     <button type="button" class="btn-comprar" id="btn-compra-multi" onclick="comprarItem('multidisparo')">80 G</button>
                 </div>
 
-                <!-- 2. Ráfaga -->
+                <!-- 3. Balas Criogénicas -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-hielo">Nv. 0</span>
+                    <div class="tarjeta-icono">❄️</div>
+                    <div class="tarjeta-nombre">Balas Criogénicas</div>
+                    <div class="tarjeta-desc" id="desc-hielo">Ralentiza y congela enemigos.<br>Siguiente: <b>Congela 2.8s</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-hielo" onclick="comprarItem('hielo')">85 G</button>
+                </div>
+
+                <!-- 4. Rebote Balístico -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-rebote">Nv. 0</span>
+                    <div class="tarjeta-icono">🔄</div>
+                    <div class="tarjeta-nombre">Rebote Balístico</div>
+                    <div class="tarjeta-desc" id="desc-rebote">Rebota en muros y esquinas.<br>Siguiente: <b>+1 Rebote</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-rebote" onclick="comprarItem('rebote')">95 G</button>
+                </div>
+
+                <!-- 5. Imán de Oro -->
+                <div class="tarjeta">
+                    <span class="tarjeta-nivel-badge" id="badge-lv-iman">Nv. 0</span>
+                    <div class="tarjeta-icono">🧲</div>
+                    <div class="tarjeta-nombre">Imán de Oro</div>
+                    <div class="tarjeta-desc" id="desc-iman">Multiplica el oro ganado.<br>Siguiente: <b>+25% Oro</b></div>
+                    <button type="button" class="btn-comprar" id="btn-compra-iman" onclick="comprarItem('iman')">70 G</button>
+                </div>
+
+                <!-- 6. Ráfaga -->
                 <div class="tarjeta">
                     <span class="tarjeta-nivel-badge" id="badge-lv-rafaga">Nv. 0</span>
                     <div class="tarjeta-icono">☄️</div>
@@ -546,7 +617,7 @@
                     <button type="button" class="btn-comprar" id="btn-compra-rafaga" onclick="comprarItem('rafaga')">90 G</button>
                 </div>
 
-                <!-- 3. Perforante -->
+                <!-- 7. Perforante -->
                 <div class="tarjeta">
                     <span class="tarjeta-nivel-badge" id="badge-lv-perf">Nv. 0</span>
                     <div class="tarjeta-icono">⚡</div>
@@ -555,7 +626,7 @@
                     <button type="button" class="btn-comprar" id="btn-compra-perf" onclick="comprarItem('perforante')">100 G</button>
                 </div>
 
-                <!-- 4. Botas de Velocidad -->
+                <!-- 8. Botas de Velocidad -->
                 <div class="tarjeta">
                     <span class="tarjeta-nivel-badge" id="badge-lv-vel">Nv. 0</span>
                     <div class="tarjeta-icono">👟</div>
@@ -564,7 +635,7 @@
                     <button type="button" class="btn-comprar" id="btn-compra-vel" onclick="comprarItem('velocidad')">60 G</button>
                 </div>
 
-                <!-- 5. Linterna Táctica -->
+                <!-- 9. Linterna Táctica -->
                 <div class="tarjeta">
                     <span class="tarjeta-nivel-badge" id="badge-lv-vis">Nv. 0</span>
                     <div class="tarjeta-icono">💡</div>
@@ -573,7 +644,7 @@
                     <button type="button" class="btn-comprar" id="btn-compra-vis" onclick="comprarItem('vision')">50 G</button>
                 </div>
 
-                <!-- 6. Escudo de Plasma -->
+                <!-- 10. Escudo de Plasma -->
                 <div class="tarjeta">
                     <span class="tarjeta-nivel-badge" id="badge-lv-escudo">Nv. 0</span>
                     <div class="tarjeta-icono">🛡️</div>
@@ -582,7 +653,7 @@
                     <button type="button" class="btn-comprar" id="btn-compra-escudo" onclick="comprarItem('escudo')">75 G</button>
                 </div>
 
-                <!-- 7. Vida Máxima -->
+                <!-- 11. Vida Máxima -->
                 <div class="tarjeta">
                     <span class="tarjeta-nivel-badge" id="badge-lv-vida">Nv. 3</span>
                     <div class="tarjeta-icono">❤️</div>
@@ -739,7 +810,11 @@
             const chipsCont = document.getElementById("top-chips-mejoras");
             chipsCont.innerHTML = "";
             const mapaIconos = {
+                "dano": "💥 Daño",
                 "multidisparo": "🔱 Multi",
+                "hielo": "❄️ Hielo",
+                "rebote": "🔄 Rebote",
+                "iman": "🧲 Imán",
                 "rafaga": "☄️ Ráfaga",
                 "perforante": "⚡ Perforante",
                 "velocidad": "👟 Vel",
@@ -776,8 +851,20 @@
                 }
             }
 
+            updateCard("btn-compra-dano", "badge-lv-dano", "desc-dano", "dano", 
+                (lv) => `Potencia cada proyectil.<br>Siguiente: <b>+${lv + 2} Daño/bala</b>`);
+
             updateCard("btn-compra-multi", "badge-lv-multi", "desc-multi", "multidisparo", 
                 (lv) => `Dispara en abanico.<br>Siguiente: <b>${1 + (lv + 1) * 2} proyectiles</b>`);
+
+            updateCard("btn-compra-hielo", "badge-lv-hielo", "desc-hielo", "hielo", 
+                (lv) => `Ralentiza y congela enemigos.<br>Siguiente: <b>Congela ${(2.2 + (lv + 1) * 0.6).toFixed(1)}s</b>`);
+
+            updateCard("btn-compra-rebote", "badge-lv-rebote", "desc-rebote", "rebote", 
+                (lv) => `Rebota en muros y esquinas.<br>Siguiente: <b>+${lv + 1} rebote(s)</b>`);
+
+            updateCard("btn-compra-iman", "badge-lv-iman", "desc-iman", "iman", 
+                (lv) => `Multiplica el oro ganado.<br>Siguiente: <b>+${(lv + 1) * 25}% Oro</b>`);
             
             updateCard("btn-compra-rafaga", "badge-lv-rafaga", "desc-rafaga", "rafaga", 
                 (lv) => `Ráfagas rápidas de balas.<br>Siguiente: <b>x${Math.min(7, 1 + (lv + 1) * 2)} ráfaga</b>`);

@@ -37,8 +37,12 @@ ESTADO_JUEGO = {
     "ultimo_dano": 0.0,
     "mejoras": {
         "multidisparo": 0,   # Dispara 1 + 2*lv proyectiles en abanico
-        "rafaga": 0,         # Ráfagas rápidas de disparos
+        "dano": 0,           # +1 de daño por bala por nivel (1, 2, 3, 4...)
+        "rafaga": 0,         # Ráfagas rápidas continuas
         "perforante": 0,     # Atraviesa paredes y enemigos
+        "hielo": 0,          # Balas criogénicas que congelan/ralentizan 60%
+        "rebote": 0,         # Balas rebotan en muros
+        "iman": 0,           # +25% de oro por baja y cofre
         "velocidad": 0,      # Aumenta velocidad de movimiento
         "vision": 0,         # Aumenta el campo de visión / linterna
     },
@@ -65,8 +69,12 @@ def resetear_progreso_total():
     ESTADO_JUEGO["max_escudo"] = 0
     ESTADO_JUEGO["mejoras"] = {
         "multidisparo": 0,
+        "dano": 0,
         "rafaga": 0,
         "perforante": 0,
+        "hielo": 0,
+        "rebote": 0,
+        "iman": 0,
         "velocidad": 0,
         "vision": 0,
     }
@@ -79,10 +87,18 @@ def obtener_costo_mejora(item):
     m = ESTADO_JUEGO["mejoras"]
     if item == "multidisparo":
         return 80 + m.get("multidisparo", 0) * 40
+    elif item == "dano":
+        return 110 + m.get("dano", 0) * 55
     elif item == "rafaga":
         return 90 + m.get("rafaga", 0) * 45
     elif item == "perforante":
         return 100 + m.get("perforante", 0) * 50
+    elif item == "hielo":
+        return 85 + m.get("hielo", 0) * 40
+    elif item == "rebote":
+        return 95 + m.get("rebote", 0) * 45
+    elif item == "iman":
+        return 70 + m.get("iman", 0) * 35
     elif item == "velocidad":
         return 60 + m.get("velocidad", 0) * 30
     elif item == "vision":
@@ -96,8 +112,12 @@ def obtener_costo_mejora(item):
 def obtener_resumen_tienda():
     return {
         "multidisparo": {"nivel": ESTADO_JUEGO["mejoras"].get("multidisparo", 0), "costo": obtener_costo_mejora("multidisparo")},
+        "dano": {"nivel": ESTADO_JUEGO["mejoras"].get("dano", 0), "costo": obtener_costo_mejora("dano")},
         "rafaga": {"nivel": ESTADO_JUEGO["mejoras"].get("rafaga", 0), "costo": obtener_costo_mejora("rafaga")},
         "perforante": {"nivel": ESTADO_JUEGO["mejoras"].get("perforante", 0), "costo": obtener_costo_mejora("perforante")},
+        "hielo": {"nivel": ESTADO_JUEGO["mejoras"].get("hielo", 0), "costo": obtener_costo_mejora("hielo")},
+        "rebote": {"nivel": ESTADO_JUEGO["mejoras"].get("rebote", 0), "costo": obtener_costo_mejora("rebote")},
+        "iman": {"nivel": ESTADO_JUEGO["mejoras"].get("iman", 0), "costo": obtener_costo_mejora("iman")},
         "velocidad": {"nivel": ESTADO_JUEGO["mejoras"].get("velocidad", 0), "costo": obtener_costo_mejora("velocidad")},
         "vision": {"nivel": ESTADO_JUEGO["mejoras"].get("vision", 0), "costo": obtener_costo_mejora("vision")},
         "vida": {"nivel": ESTADO_JUEGO["max_vidas"], "costo": obtener_costo_mejora("vida")},
@@ -213,14 +233,66 @@ def obtener_laberinto(nivel):
 
 def spawnear_enemigos(nivel, cols, filas, ancho_celda, alto_celda, tam_p):
     random.seed(nivel * 999)
-    cantidad = min(2 + (nivel // 2), 9)
+    cantidad = min(3 + nivel, 15)
     enemigos = []
-    for _ in range(cantidad):
+    
+    # Cada 5 niveles hay un Jefe Dorado desafiante
+    tiene_jefe = (nivel % 5 == 0)
+
+    for i in range(cantidad):
         c = random.randint(cols // 3, cols - 1)
         r = random.randint(0, filas - 1)
         ex = c * ancho_celda + (ancho_celda - tam_p) // 2
         ey = r * alto_celda + (alto_celda - tam_p) // 2
-        enemigos.append([float(ex), float(ey), random.randint(15, 45)])
+
+        if tiene_jefe and i == 0:
+            # Jefe Dorado (20+ HP, alto botín)
+            vida = 18 + nivel * 2
+            enemigo = {
+                "x": float(ex), "y": float(ey), "cd": random.randint(15, 30),
+                "vida": vida, "vida_max": vida, "tipo": "jefe",
+                "color": (0, 215, 255), "borde": (50, 245, 255),
+                "oro": 120 + nivel * 10, "vel": 2.2, "congelado_hasta": 0.0
+            }
+        else:
+            rnd = random.random()
+            if nivel >= 4 and rnd < 0.28:
+                # Tanque Verde: 10 HP (¡aguanta 10 disparos!)
+                vida = 10
+                enemigo = {
+                    "x": float(ex), "y": float(ey), "cd": random.randint(25, 45),
+                    "vida": vida, "vida_max": vida, "tipo": "verde",
+                    "color": (40, 215, 50), "borde": (100, 255, 120),
+                    "oro": 60 + nivel * 5, "vel": 1.5, "congelado_hasta": 0.0
+                }
+            elif nivel >= 3 and rnd < 0.55:
+                # Blindado Morado: 6 HP
+                vida = 6
+                enemigo = {
+                    "x": float(ex), "y": float(ey), "cd": random.randint(20, 42),
+                    "vida": vida, "vida_max": vida, "tipo": "morado",
+                    "color": (210, 40, 160), "borde": (255, 120, 220),
+                    "oro": 35 + nivel * 4, "vel": 1.8, "congelado_hasta": 0.0
+                }
+            elif nivel >= 2 and rnd < 0.80:
+                # Ágil Naranja: 3 HP
+                vida = 3
+                enemigo = {
+                    "x": float(ex), "y": float(ey), "cd": random.randint(15, 36),
+                    "vida": vida, "vida_max": vida, "tipo": "naranja",
+                    "color": (30, 140, 255), "borde": (80, 210, 255),
+                    "oro": 22 + nivel * 3, "vel": 2.5, "congelado_hasta": 0.0
+                }
+            else:
+                # Básico Rojo: 1 HP (muere de 1 impacto)
+                vida = 1
+                enemigo = {
+                    "x": float(ex), "y": float(ey), "cd": random.randint(22, 50),
+                    "vida": vida, "vida_max": vida, "tipo": "rojo",
+                    "color": (45, 45, 235), "borde": (100, 100, 255),
+                    "oro": 12 + nivel * 2, "vel": 2.0, "congelado_hasta": 0.0
+                }
+        enemigos.append(enemigo)
     return enemigos
 
 def distancia_punto_a_segmento(px, py, x1, y1, x2, y2):
@@ -263,14 +335,18 @@ def procesar_compra(item):
         mostrar_aviso(f"Necesitas {costo}G de oro")
         return
 
-    if item in ["multidisparo", "rafaga", "perforante", "velocidad", "vision"]:
+    if item in ["multidisparo", "dano", "rafaga", "perforante", "hielo", "rebote", "iman", "velocidad", "vision"]:
         ESTADO_JUEGO["monedas"] -= costo
         ESTADO_JUEGO["mejoras"][item] += 1
         nuevo_lv = ESTADO_JUEGO["mejoras"][item]
         nombres = {
             "multidisparo": f"¡Multidisparo Nivel {nuevo_lv}!",
+            "dano": f"¡Daño Potenciado Nivel {nuevo_lv} (+{nuevo_lv+1} Daño)! ",
             "rafaga": f"¡Ráfaga Nivel {nuevo_lv}!",
             "perforante": f"¡Bala Perforante Nivel {nuevo_lv}!",
+            "hielo": f"¡Balas Criogénicas Nivel {nuevo_lv} (Congela 60%)!",
+            "rebote": f"¡Rebote Balístico Nivel {nuevo_lv}!",
+            "iman": f"¡Imán de Oro Nivel {nuevo_lv} (+{nuevo_lv*25}%)!",
             "velocidad": f"¡Botas Nivel {nuevo_lv} (+20% Vel)!",
             "vision": f"¡Linterna Nivel {nuevo_lv} (+25px)!",
         }
@@ -312,13 +388,14 @@ def disparar_armas_jugador(cx, cy, target_x, target_y):
 
     lv_perf = ESTADO_JUEGO["mejoras"].get("perforante", 0)
     perforaciones = 1 + lv_perf * 3
+    rebotes = ESTADO_JUEGO["mejoras"].get("rebote", 0)
 
     for mult in multiplicadores_rafaga:
         vel = vel_base * mult
         for ang in angulos:
             vx = math.cos(ang) * vel
             vy = math.sin(ang) * vel
-            ESTADO_JUEGO["balas"].append([cx, cy, vx, vy, perforaciones])
+            ESTADO_JUEGO["balas"].append([cx, cy, vx, vy, perforaciones, rebotes])
 
 def aplicar_dano_jugador():
     ESTADO_JUEGO["ultimo_dano"] = time.time()
@@ -342,31 +419,56 @@ def actualizar_entidades(px, py, tam_p, paredes):
 
     radio_bala = 4
     nuevas_balas = []
+    dano_jugador = 1 + ESTADO_JUEGO["mejoras"].get("dano", 0)
+    lv_hielo = ESTADO_JUEGO["mejoras"].get("hielo", 0)
+    tiempo_congelar = (2.2 + lv_hielo * 0.6) if lv_hielo > 0 else 0.0
+    mult_oro = 1.0 + ESTADO_JUEGO["mejoras"].get("iman", 0) * 0.25
 
     # 1. Mover balas del jugador
-    for bx, by, vx, vy, perf in ESTADO_JUEGO["balas"]:
+    for bala in ESTADO_JUEGO["balas"]:
+        bx, by, vx, vy, perf, rebs = bala[0], bala[1], bala[2], bala[3], bala[4], bala[5]
         nbx, nby = bx + vx, by + vy
         cercanas_b = obtener_paredes_en_rango(nbx, nby, radio_bala*2, radio_bala*2, paredes, radio=40, min_k=4)
         
         if toca_pared(nbx - radio_bala, nby - radio_bala, radio_bala*2, radio_bala*2, cercanas_b):
-            perf -= 1
-            if perf <= 0:
-                continue
-
-        for i in range(len(ESTADO_JUEGO["enemigos"]) - 1, -1, -1):
-            ex, ey, _ = ESTADO_JUEGO["enemigos"][i]
-            if rect_colision(nbx - radio_bala, nby - radio_bala, radio_bala*2, radio_bala*2, ex, ey, tam_p, tam_p):
-                ESTADO_JUEGO["enemigos"].pop(i)
-                oro_enemigo = 12 + ESTADO_JUEGO["nivel"] * 3
-                ESTADO_JUEGO["monedas"] += oro_enemigo
-                ESTADO_JUEGO["enemigos_derrotados_nivel"] += 1
-                mostrar_aviso(f"+{oro_enemigo}G (Enemigo derrotado)")
+            if rebs > 0:
+                rebs -= 1
+                vx = -vx
+                vy = -vy
+                nbx = bx + vx
+                nby = by + vy
+            else:
                 perf -= 1
+                if perf <= 0:
+                    continue
+
+        impacto = False
+        for i in range(len(ESTADO_JUEGO["enemigos"]) - 1, -1, -1):
+            en = ESTADO_JUEGO["enemigos"][i]
+            ex, ey = en["x"], en["y"]
+            if rect_colision(nbx - radio_bala, nby - radio_bala, radio_bala*2, radio_bala*2, ex, ey, tam_p, tam_p):
+                en["vida"] -= dano_jugador
+
+                if tiempo_congelar > 0:
+                    en["congelado_hasta"] = ahora + tiempo_congelar
+
+                if en["vida"] <= 0:
+                    oro_ganado = int(en.get("oro", 15) * mult_oro)
+                    ESTADO_JUEGO["monedas"] += oro_ganado
+                    ESTADO_JUEGO["enemigos_derrotados_nivel"] += 1
+                    tipo_str = en.get("tipo", "enemigo").capitalize()
+                    mostrar_aviso(f"+{oro_ganado}G (¡{tipo_str} derrotado!)")
+                    ESTADO_JUEGO["enemigos"].pop(i)
+                else:
+                    mostrar_aviso(f"¡Impacto! {en['vida']}/{en['vida_max']} HP")
+
+                perf -= 1
+                impacto = True
                 if perf <= 0:
                     break
 
         if perf > 0 and 0 <= nbx <= W and 0 <= nby <= H:
-            nuevas_balas.append([nbx, nby, vx, vy, perf])
+            nuevas_balas.append([nbx, nby, vx, vy, perf, rebs])
 
     ESTADO_JUEGO["balas"] = nuevas_balas
 
@@ -391,32 +493,36 @@ def actualizar_entidades(px, py, tam_p, paredes):
     ESTADO_JUEGO["balas_enemigas"] = nuevas_balas_enemigas
 
     # 3. Mover enemigos y disparar
-    vel_enemigo = 2.0
     rad_v = obtener_radio_vision()
-    for enemigo in ESTADO_JUEGO["enemigos"]:
-        ex, ey, cd = enemigo
+    for en in ESTADO_JUEGO["enemigos"]:
+        ex, ey = en["x"], en["y"]
         dx, dy = px - ex, py - ey
         dist = math.hypot(dx, dy)
+        vel_en = en.get("vel", 2.0)
+
+        if ahora < en.get("congelado_hasta", 0.0):
+            vel_en *= 0.45
         
         if 0 < dist < rad_v * 1.5:
-            vx = (dx / dist) * vel_enemigo
-            vy = (dy / dist) * vel_enemigo
+            vx = (dx / dist) * vel_en
+            vy = (dy / dist) * vel_en
             cercanas_e = obtener_paredes_en_rango(ex, ey, tam_p, tam_p, paredes, radio=50, min_k=4)
             if not toca_pared(ex + vx, ey, tam_p, tam_p, cercanas_e):
-                enemigo[0] += vx
-            if not toca_pared(enemigo[0], ey + vy, tam_p, tam_p, cercanas_e):
-                enemigo[1] += vy
+                en["x"] += vx
+            if not toca_pared(en["x"], ey + vy, tam_p, tam_p, cercanas_e):
+                en["y"] += vy
 
-            enemigo[2] -= 1
-            if enemigo[2] <= 0:
+            en["cd"] -= 1
+            if en["cd"] <= 0:
                 vel_be = 7.5
-                ecx, ecy = enemigo[0] + tam_p / 2.0, enemigo[1] + tam_p / 2.0
+                ecx, ecy = en["x"] + tam_p / 2.0, en["y"] + tam_p / 2.0
                 ESTADO_JUEGO["balas_enemigas"].append([ecx, ecy, (dx / dist) * vel_be, (dy / dist) * vel_be])
-                enemigo[2] = random.randint(28, 50)
+                cadencia = 22 if en["tipo"] == "jefe" else (30 if en["tipo"] == "naranja" else 42)
+                en["cd"] = random.randint(cadencia, cadencia + 25)
 
-        if rect_colision(px, py, tam_p, tam_p, enemigo[0], enemigo[1], tam_p, tam_p):
-            enemigo[0] -= (dx / max(1.0, dist)) * 18
-            enemigo[1] -= (dy / max(1.0, dist)) * 18
+        if rect_colision(px, py, tam_p, tam_p, en["x"], en["y"], tam_p, tam_p):
+            en["x"] -= (dx / max(1.0, dist)) * 18
+            en["y"] -= (dy / max(1.0, dist)) * 18
             if aplicar_dano_jugador():
                 devolver_inicio = True
 
@@ -509,8 +615,9 @@ def generar_imagen(request):
         # Si toca el tesoro -> premio según el nivel y abre la tienda sobre el tablero
         gano = rect_colision(x_origen, y_origen, tam_p, tam_p, tx, ty, tam_t, tam_t)
         if gano:
-            premio_nivel = 100 + ESTADO_JUEGO["nivel"] * 25
-            premio_enemigos = ESTADO_JUEGO["enemigos_derrotados_nivel"] * (12 + ESTADO_JUEGO["nivel"] * 3)
+            mult_oro = 1.0 + ESTADO_JUEGO["mejoras"].get("iman", 0) * 0.25
+            premio_nivel = int((100 + ESTADO_JUEGO["nivel"] * 25) * mult_oro)
+            premio_enemigos = int(ESTADO_JUEGO["enemigos_derrotados_nivel"] * (12 + ESTADO_JUEGO["nivel"] * 3) * mult_oro)
             ESTADO_JUEGO["monedas"] += premio_nivel
             ESTADO_JUEGO["ultimo_premio_nivel"] = premio_nivel
             ESTADO_JUEGO["ultimo_premio_enemigos"] = premio_enemigos
@@ -524,6 +631,7 @@ def generar_imagen(request):
         p.save()
 
     # --- RENDERIZADO EN CUARTO OSCURO ---
+    ahora_render = time.time()
     sprite_p, sprite_t = cargar_sprites(p.imagen.url, tam_p, tam_t)
     img = np.full((H, W, 3), 12, dtype=np.uint8)
     
@@ -548,20 +656,65 @@ def generar_imagen(request):
         cv2.circle(img, (cx_p, cy_p), int(tam_p * 0.85), (255, 220, 0), 2)
         cv2.circle(img, (cx_p, cy_p), int(tam_p * 0.95), (255, 170, 0), 1)
 
-    for ex, ey, _ in ESTADO_JUEGO["enemigos"]:
+    # Renderizado de enemigos con tiers de color y barra de vida flotante
+    for en in ESTADO_JUEGO["enemigos"]:
+        ex, ey = en["x"], en["y"]
         if math.hypot((ex + tam_p/2) - cx_p, (ey + tam_p/2) - cy_p) <= rad_v:
             ix, iy = int(ex), int(ey)
-            cv2.rectangle(img, (ix, iy), (ix + tam_p, iy + tam_p), (40, 40, 230), -1)
-            cv2.rectangle(img, (ix, iy), (ix + tam_p, iy + tam_p), (120, 120, 255), 2)
+            es_congelado = ahora_render < en.get("congelado_hasta", 0.0)
+            color_cuerpo = (255, 225, 120) if es_congelado else en.get("color", (45, 45, 235))
+            color_borde = (255, 255, 200) if es_congelado else en.get("borde", (100, 100, 255))
+            
+            cv2.rectangle(img, (ix, iy), (ix + tam_p, iy + tam_p), color_cuerpo, -1)
+            cv2.rectangle(img, (ix, iy), (ix + tam_p, iy + tam_p), color_borde, 2)
 
+            # Efecto corona si es Jefe Dorado
+            if en.get("tipo") == "jefe":
+                cv2.circle(img, (ix + tam_p // 2, iy + tam_p // 2), int(tam_p * 0.85), (0, 240, 255), 1)
+
+            # Barra de vida flotante si vida_max > 1
+            vida_max = en.get("vida_max", 1)
+            if vida_max > 1:
+                vida_act = max(0, en.get("vida", 1))
+                bar_w = tam_p + 4
+                bar_h = 3
+                bar_x = ix - 2
+                bar_y = max(1, iy - 6)
+                # Fondo oscuro de barra
+                cv2.rectangle(img, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (25, 25, 25), -1)
+                pct = max(0.0, min(1.0, vida_act / float(vida_max)))
+                fill_w = int(bar_w * pct)
+                if fill_w > 0:
+                    col_hp = (40, 220, 60) if pct > 0.5 else ((30, 200, 245) if pct > 0.25 else (40, 40, 245))
+                    cv2.rectangle(img, (bar_x, bar_y), (bar_x + fill_w, bar_y + bar_h), col_hp, -1)
+
+    # Renderizado de balas del jugador
     lv_perf = ESTADO_JUEGO["mejoras"].get("perforante", 0)
-    color_bala_j = (255, 230, 50) if lv_perf > 0 else (0, 190, 255)
-    tam_bala = 4 + min(4, lv_perf)
-    for bx, by, _, _, _ in ESTADO_JUEGO["balas"]:
-        cv2.circle(img, (int(bx), int(by)), tam_bala, color_bala_j, -1)
-        if lv_perf > 0:
-            cv2.circle(img, (int(bx), int(by)), tam_bala + 2, (100, 255, 255), 1)
+    lv_dano = ESTADO_JUEGO["mejoras"].get("dano", 0)
+    lv_hielo = ESTADO_JUEGO["mejoras"].get("hielo", 0)
+    lv_rebote = ESTADO_JUEGO["mejoras"].get("rebote", 0)
 
+    if lv_hielo > 0:
+        color_bala_j = (255, 235, 120)  # Glacial cyan
+    elif lv_dano > 0:
+        color_bala_j = (40, 160, 255)  # Fuego / plasma naranja
+    elif lv_perf > 0:
+        color_bala_j = (255, 230, 50)  # Amarillo dorado
+    else:
+        color_bala_j = (0, 210, 255)   # Azul clásico
+
+    tam_bala = 4 + min(4, lv_perf + (1 if lv_dano > 1 else 0))
+
+    for b in ESTADO_JUEGO["balas"]:
+        bx, by = b[0], b[1]
+        ibx, iby = int(bx), int(by)
+        cv2.circle(img, (ibx, iby), tam_bala, color_bala_j, -1)
+        if lv_rebote > 0:
+            cv2.circle(img, (ibx, iby), tam_bala + 2, (120, 255, 180), 1)
+        elif lv_perf > 0:
+            cv2.circle(img, (ibx, iby), tam_bala + 2, (100, 255, 255), 1)
+
+    # Renderizado de balas enemigas
     for ebx, eby, _, _ in ESTADO_JUEGO["balas_enemigas"]:
         if math.hypot(ebx - cx_p, eby - cy_p) <= rad_v * 1.2:
             cv2.circle(img, (int(ebx), int(eby)), 4, (60, 60, 255), -1)
