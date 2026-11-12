@@ -1,0 +1,20 @@
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    volumes:
+    - .:/api
+    environment:
+      DATABASE_URL: postgres://alumno:ldp@db:5432/postgres
+    depends_on: [db]
+  db:
+    image: postgres:16
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_PASSWORD: ldp
+      POSTGRES_USER: alumno
+      POSTGRES_DB: postgres
+
+    volumes: ["db_data:/var/lib/postgresql/data"]
+volumes:
+  db_data:

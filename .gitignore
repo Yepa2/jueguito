@@ -1,0 +1,25 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Configuración local
+.env
+
+# macOS
+.DS_Store
+
+# Editores
+.vscode/
+.idea/
+
+# Base de datos local SQLite
+*.sqlite3
+*.sqlite3-journal
+
+staticfiles/
+*.log

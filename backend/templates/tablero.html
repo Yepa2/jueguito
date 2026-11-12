@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laberinto Oscuro - Tablero</title>
+    <style>
+        body {
+            background-color: #121215;
+            color: #f4f4f5;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+        h2 {
+            margin: 6px 0;
+            font-size: 1.35rem;
+        }
+        .controles {
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            color: #a1a1aa;
+            background: #1f1f23;
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid #2e2e36;
+        }
+        .controles span {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+        #contenedor-juego {
+            position: relative;
+            width: min(1000px, 96vw);
+            aspect-ratio: 1000 / 500;
+            height: auto;
+            border: 3px solid #3f3f46;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
+            background: #0c0c0c;
+            /* Oculta el puntero nativo para que solo se vea la mira personalizada */
+            cursor: none;
+            touch-action: none;
+        }
+        #mapa {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* --- MIRA PERSONALIZADA DE ALTA VISIBILIDAD --- */
+        #mira-cursor {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 32px;
+            height: 32px;
+            pointer-events: none; /* No bloquea los clics en el canvas */
+            z-index: 15;
+            display: none;
+            will-change: transform;
+            transform: translate(-50%, -50%);
+        }
+        /* Círculo exterior brillante con sombra neón */
+        #mira-cursor::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border: 2px solid #00f0ff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00f0ff, inset 0 0 4px #00f0ff;
+            box-sizing: border-box;
+        }
+        /* Punto central amarillo de máxima precisión */
+        #mira-cursor::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            background: #fbbf24;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 6px #fbbf24;
+        }
+        /* Rayas de la cruz táctica */
+        .mira-eje-h {
+            position: absolute;
+            top: 50%;
+            left: -6px;
+            right: -6px;
+            height: 2px;
+            background: rgba(0, 240, 255, 0.7);
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+        .mira-eje-v {
+            position: absolute;
+            left: 50%;
+            top: -6px;
+            bottom: -6px;
+            width: 2px;
+            background: rgba(0, 240, 255, 0.7);
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+
+        #estado-error {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(220, 38, 38, 0.9);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            display: none;
+            z-index: 30;
+        }
+        /* Modal de Tienda con Tarjetas sobre el tablero */
+        #overlay-tienda {
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 10, 14, 0.92);
+            backdrop-filter: blur(4px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 20;
+            cursor: default; /* El cursor vuelve a la normalidad en el menú de tienda */
+        }
+        #overlay-tienda.activo {
+            display: flex;
+        }
+        .titulo-tesoro {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #fbbf24;
+            margin: 0 0 6px 0;
+        }
+        .resumen-oro {
+            background: #1f1f26;
+            border: 1px solid #3f3f46;
+            border-radius: 8px;
+            padding: 8px 18px;
+            font-size: 0.9rem;
+            color: #e4e4e7;
+            margin-bottom: 18px;
+            display: flex;
+            gap: 18px;
+        }
+        .resumen-oro b {
+            color: #4ade80;
+        }
+        .oro-total {
+            color: #fbbf24 !important;
+            font-size: 1rem;
+        }
+        .grid-tarjetas {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            width: 95%;
+            max-width: 940px;
+            margin-bottom: 20px;
+        }
+        .tarjeta {
+            background: linear-gradient(180deg, #272730 0%, #1c1c22 100%);
+            border: 2px solid #3f3f46;
+            border-radius: 10px;
+            padding: 14px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s;
+        }
+        .tarjeta:hover {
+            transform: translateY(-4px);
+            border-color: #fbbf24;
+        }
+        .tarjeta-icono {
+            font-size: 1.8rem;
+            margin-bottom: 6px;
+        }
+        .tarjeta-nombre {
+            font-weight: 700;
+            font-size: 0.92rem;
+            color: #f4f4f5;
+            margin-bottom: 6px;
+        }
+        .tarjeta-desc {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+            margin-bottom: 12px;
+            line-height: 1.3;
+            flex-grow: 1;
+        }
+        .tarjeta-precio {
+            background: #fbbf24;
+            color: #18181b;
+            font-weight: 800;
+            font-size: 0.82rem;
+            padding: 5px 12px;
+            border-radius: 6px;
+            width: 80%;
+        }
+        .btn-continuar {
+            background: #22c55e;
+            color: #052e16;
+            font-weight: 800;
+            font-size: 1rem;
+            padding: 10px 28px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-continuar:hover {
+            background: #4ade80;
+        }
+        .acciones {
+            margin-top: 12px;
+            display: flex;
+            gap: 12px;
+        }
+        .btn {
+            padding: 8px 16px;
+            background-color: #3f3f46;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-reiniciar {
+            background-color: #ef4444;
+        }
+
+        /* --- CONTROLES TÁCTILES PARA MÓVILES / TABLETS --- */
+        .controles-tactiles {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 14px;
+            margin-bottom: 10px;
+            user-select: none;
+            -webkit-user-select: none;
+            flex-wrap: wrap;
+        }
+        .dpad {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .dpad-mid {
+            display: flex;
+            gap: 6px;
+        }
+        .btn-touch {
+            background-color: #27272a;
+            color: #f4f4f5;
+            border: 2px solid #3f3f46;
+            border-radius: 8px;
+            font-size: 1.15rem;
+            font-weight: bold;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: manipulation;
+            transition: background-color 0.1s, transform 0.1s;
+        }
+        .btn-touch:active {
+            background-color: #4f46e5;
+            border-color: #6366f1;
+            transform: scale(0.95);
+        }
+        .btn-touch-action {
+            width: auto;
+            padding: 0 16px;
+            height: 48px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Laberinto Oscuro</h2>
+    <div class="controles">
+        Mover: <span>W, A, S, D</span> | Disparar: <span>Clic Izquierdo</span> | Reiniciar Nivel 1: <span>R</span>
+    </div>
+
+    <div id="contenedor-juego">
+        <img id="mapa" src="/api/generar-imagen" alt="Cargando tablero..." draggable="false">
+        
+        <!-- Elemento de la Mira Táctica -->
+        <div id="mira-cursor">
+            <div class="mira-eje-h"></div>
+            <div class="mira-eje-v"></div>
+        </div>
+
+        <div id="estado-error"></div>
+
+        <!-- Tienda en Tarjetas sobre el tablero -->
+        <div id="overlay-tienda">
+            <div class="titulo-tesoro">¡TESORO ENCONTRADO!</div>
+            <div class="resumen-oro">
+                <span>Tesoro del Nivel: <b>+<span id="lbl-premio-nivel">100</span>G</b></span>
+                <span>Enemigos derrotados (<span id="lbl-kills">0</span>): <b>+<span id="lbl-premio-enemigos">0</span>G</b></span>
+                <span>Oro Disponible: <b class="oro-total"><span id="lbl-monedas">0</span>G</b></span>
+            </div>
+
+            <div class="grid-tarjetas">
+                <div class="tarjeta" onclick="comprarItem('triple')">
+                    <div class="tarjeta-icono">🔱</div>
+                    <div class="tarjeta-nombre">Disparo Triple</div>
+                    <div class="tarjeta-desc">Dispara 3 bolas en abanico por cada clic.</div>
+                    <div class="tarjeta-precio">100 G</div>
+                </div>
+
+                <div class="tarjeta" onclick="comprarItem('rafaga')">
+                    <div class="tarjeta-icono">☄️</div>
+                    <div class="tarjeta-nombre">Ráfaga x3</div>
+                    <div class="tarjeta-desc">Lanza una ráfaga de 3 proyectiles seguidos.</div>
+                    <div class="tarjeta-precio">120 G</div>
+                </div>
+
+                <div class="tarjeta" onclick="comprarItem('perforante')">
+                    <div class="tarjeta-icono">⚡</div>
+                    <div class="tarjeta-nombre">Bala Perforante</div>
+                    <div class="tarjeta-desc">Atraviesa enemigos y hasta 1 pared cercana.</div>
+                    <div class="tarjeta-precio">150 G</div>
+                </div>
+
+                <div class="tarjeta" onclick="comprarItem('vida')">
+                    <div class="tarjeta-icono">❤️</div>
+                    <div class="tarjeta-nombre">+1 Vida Máx</div>
+                    <div class="tarjeta-desc">Aumenta tu salud máxima y recupera 1 punto.</div>
+                    <div class="tarjeta-precio">60 G</div>
+                </div>
+
+                <div class="tarjeta" onclick="comprarItem('escudo')">
+                    <div class="tarjeta-icono">🛡️</div>
+                    <div class="tarjeta-nombre">Escudo Recargable</div>
+                    <div class="tarjeta-desc">Bloquea daño y se recarga tras 5s sin golpes.</div>
+                    <div class="tarjeta-precio">90 G</div>
+                </div>
+            </div>
+
+            <button class="btn-continuar" onclick="empezarSiguienteNivel()">
+                Empezar Nivel <span id="lbl-sig-nivel">2</span> ▶
+            </button>
+        </div>
+    </div>
+
+    <div id="controles-tactiles" class="controles-tactiles">
+        <div class="dpad">
+            <button type="button" class="btn-touch btn-dpad" data-key="w">▲</button>
+            <div class="dpad-mid">
+                <button type="button" class="btn-touch btn-dpad" data-key="a">◄</button>
+                <button type="button" class="btn-touch btn-dpad" data-key="s">▼</button>
+                <button type="button" class="btn-touch btn-dpad" data-key="d">►</button>
+            </div>
+        </div>
+        <div class="touch-actions">
+            <button type="button" class="btn-touch btn-touch-action" onclick="reiniciarJuego()">🔄 Reiniciar (R)</button>
+        </div>
+    </div>
+
+    <div class="acciones">
+        <a href="/api/seleccion-personaje" class="btn">Cambiar Personaje</a>
+        <button class="btn btn-reiniciar" onclick="reiniciarJuego()">Reiniciar Partida (R)</button>
+    </div>
+
+    <script>
+        const contenedor = document.getElementById("contenedor-juego");
+        const imgMapa = document.getElementById("mapa");
+        const mira = document.getElementById("mira-cursor");
+        const overlayTienda = document.getElementById("overlay-tienda");
+        const estadoError = document.getElementById("estado-error");
+        
+        const URL_IMAGEN = "/api/generar-imagen";
+
+        let teclaActiva = "";
+        let clickPendiente = null;
+        let compraPendiente = "";
+        let continuarPendiente = false;
+        let cargandoFrame = false;
+        let urlAnterior = null;
+
+        // --- SEGUIMIENTO ULTRA FLUIDO DE LA MIRA ---
+        contenedor.addEventListener("mousemove", function(e) {
+            const rect = contenedor.getBoundingClientRect();
+            const posX = e.clientX - rect.left;
+            const posY = e.clientY - rect.top;
+            
+            // Usa transform para aceleración por GPU sin retrasos
+            mira.style.transform = `translate3d(${posX - 16}px, ${posY - 16}px, 0)`;
+            mira.style.display = "block";
+        });
+
+        contenedor.addEventListener("mouseleave", function() {
+            mira.style.display = "none";
+        });
+
+        window.addEventListener("keydown", function(e) {
+            const k = e.key.toLowerCase();
+            if (["w", "a", "s", "d", "r"].includes(k)) {
+                teclaActiva = k;
+            }
+        });
+
+        window.addEventListener("keyup", function(e) {
+            const k = e.key.toLowerCase();
+            if (teclaActiva === k) {
+                teclaActiva = "";
+            }
+        });
+
+        imgMapa.addEventListener("mousedown", function(e) {
+            if (e.button !== 0) return;
+            const rect = imgMapa.getBoundingClientRect();
+            const mx = Math.round((e.clientX - rect.left) * (1000 / rect.width));
+            const my = Math.round((e.clientY - rect.top) * (500 / rect.height));
+            clickPendiente = { mx, my };
+        });
+
+        imgMapa.addEventListener("touchstart", function(e) {
+            if (e.touches && e.touches.length > 0) {
+                const t = e.touches[0];
+                const rect = imgMapa.getBoundingClientRect();
+                const mx = Math.round((t.clientX - rect.left) * (1000 / rect.width));
+                const my = Math.round((t.clientY - rect.top) * (500 / rect.height));
+                clickPendiente = { mx, my };
+            }
+        }, { passive: true });
+
+        // Eventos para botones táctiles D-Pad
+        document.querySelectorAll(".btn-dpad").forEach(btn => {
+            const k = btn.dataset.key;
+            const presionar = (e) => { e.preventDefault(); teclaActiva = k; };
+            const soltar = (e) => { e.preventDefault(); if (teclaActiva === k) teclaActiva = ""; };
+            btn.addEventListener("touchstart", presionar, { passive: false });
+            btn.addEventListener("touchend", soltar, { passive: false });
+            btn.addEventListener("mousedown", presionar);
+            btn.addEventListener("mouseup", soltar);
+            btn.addEventListener("mouseleave", soltar);
+        });
+
+        function comprarItem(item) {
+            compraPendiente = item;
+        }
+
+        function empezarSiguienteNivel() {
+            continuarPendiente = true;
+        }
+
+        function reiniciarJuego() {
+            teclaActiva = "r";
+        }
+
+        async function actualizarFrame() {
+            if (cargandoFrame) return;
+            cargandoFrame = true;
+
+            const params = new URLSearchParams();
+            if (teclaActiva) {
+                params.append("tecla", teclaActiva);
+                if (teclaActiva === "r") teclaActiva = "";
+            }
+            if (clickPendiente) {
+                params.append("mx", clickPendiente.mx);
+                params.append("my", clickPendiente.my);
+                clickPendiente = null;
+            }
+            if (compraPendiente) {
+                params.append("comprar", compraPendiente);
+                compraPendiente = "";
+            }
+            if (continuarPendiente) {
+                params.append("continuar", "1");
+                continuarPendiente = false;
+            }
+            params.append("t", Date.now());
+
+            try {
+                const resp = await fetch(`${URL_IMAGEN}?${params.toString()}`);
+                if (resp.ok) {
+                    estadoError.style.display = "none";
+                    const enTienda = resp.headers.get("X-En-Tienda") === "1";
+                    const monedas = resp.headers.get("X-Monedas") || "0";
+                    const nivel = resp.headers.get("X-Nivel") || "1";
+                    const premioNiv = resp.headers.get("X-Premio-Nivel") || "100";
+                    const premioEnem = resp.headers.get("X-Premio-Enemigos") || "0";
+                    const kills = resp.headers.get("X-Kills") || "0";
+
+                    if (enTienda) {
+                        overlayTienda.classList.add("activo");
+                        mira.style.display = "none"; // Oculta la mira táctica durante la tienda
+                        document.getElementById("lbl-monedas").textContent = monedas;
+                        document.getElementById("lbl-sig-nivel").textContent = nivel;
+                        document.getElementById("lbl-premio-nivel").textContent = premioNiv;
+                        document.getElementById("lbl-premio-enemigos").textContent = premioEnem;
+                        document.getElementById("lbl-kills").textContent = kills;
+                    } else {
+                        overlayTienda.classList.remove("activo");
+                    }
+
+                    const blob = await resp.blob();
+                    const nuevaUrl = URL.createObjectURL(blob);
+                    imgMapa.src = nuevaUrl;
+                    if (urlAnterior) URL.revokeObjectURL(urlAnterior);
+                    urlAnterior = nuevaUrl;
+                } else {
+                    estadoError.textContent = `Error HTTP ${resp.status} en /api/generar-imagen`;
+                    estadoError.style.display = "block";
+                }
+            } catch (err) {
+                estadoError.textContent = "Error de conexión con el servidor";
+                estadoError.style.display = "block";
+            } finally {
+                cargandoFrame = false;
+            }
+        }
+
+        setInterval(actualizarFrame, 50);
+    </script>
+</body>
+</html>
